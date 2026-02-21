@@ -2,6 +2,7 @@
 
 * Connected `diarize` transcribe parameter to the underlying whisper C++ code
 * Added `diarize` parameter to the `transcribe` method
+* Migrated from `ffmpeg_kit_flutter_new_min` to `ffmpeg_kit_flutter_new_audio` for better audio processing support
 
 ## 1.6.0
 
