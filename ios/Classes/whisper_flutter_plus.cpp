@@ -146,6 +146,37 @@ struct whisper_print_user_data
     const std::vector<std::vector<float>> *pcmf32s;
 };
 
+// Hàm xử lý chuỗi UTF-8 tránh crash thư viện khi chuỗi từ audio sai chuẩn.
+// Thay thế các byte hỏng bằng dấu '?'
+std::string sanitizeUtf8(const std::string& str) {
+    std::string result;
+    result.reserve(str.length());
+    for (size_t i = 0; i < str.length(); ) {
+        unsigned char c = str[i];
+        if (c < 0x80) { // 1-byte
+            result += str[i++];
+        } else if ((c & 0xE0) == 0xC0) { // 2-byte
+            if (i + 1 < str.length() && (str[i+1] & 0xC0) == 0x80) {
+                result += str.substr(i, 2);
+                i += 2;
+            } else { result += "?"; i++; }
+        } else if ((c & 0xF0) == 0xE0) { // 3-byte
+            if (i + 2 < str.length() && (str[i+1] & 0xC0) == 0x80 && (str[i+2] & 0xC0) == 0x80) {
+                result += str.substr(i, 3);
+                i += 3;
+            } else { result += "?"; i++; }
+        } else if ((c & 0xF8) == 0xF0) { // 4-byte
+            if (i + 3 < str.length() && (str[i+1] & 0xC0) == 0x80 && (str[i+2] & 0xC0) == 0x80 && (str[i+3] & 0xC0) == 0x80) {
+                result += str.substr(i, 4);
+                i += 4;
+            } else { result += "?"; i++; }
+        } else { // Invalid byte
+            result += "?"; i++;
+        }
+    }
+    return result;
+}
+
 json transcribe(json jsonBody)
 {
     whisper_params params;
@@ -299,6 +330,7 @@ json transcribe(json jsonBody)
                 const char *text = whisper_full_get_segment_text(ctx, i);
 
                 std::string str(text);
+                str = sanitizeUtf8(str);
                 text_result += str;
                 if (params.no_timestamps)
                 {
@@ -313,7 +345,7 @@ json transcribe(json jsonBody)
 
                     jsonSegment["from_ts"] = t0;
                     jsonSegment["to_ts"] = t1;
-                    jsonSegment["text"] = text;
+                    jsonSegment["text"] = str;
 
                     segmentsJson.push_back(jsonSegment);
                 }
